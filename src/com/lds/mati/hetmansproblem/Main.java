@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.JFrame;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
 import org.math.plot.Plot2DPanel;
 
@@ -18,13 +20,28 @@ public class Main {
 	/**
 	 * @param args
 	 */
-	static int backwardMax = 30;
-	static int forwardMax = 300;
+	static int maxHetmans = 35;
+	static int hetmans = 8;
+	static boolean backtracking = true;
 
 	public static void main(String[] args) {
 		if (args.length > 0 && args[0].equals("benchmark")) {
+			if (args.length > 1) {
+				try {
+					maxHetmans = Integer.parseInt(args[1]);
+				} catch (NumberFormatException e) {
+					e.printStackTrace();
+				}
+			}
 			runBenchmark();
 		} else {
+			try {
+				UIManager.setLookAndFeel(UIManager
+						.getSystemLookAndFeelClassName());
+			} catch (ClassNotFoundException | InstantiationException
+					| IllegalAccessException | UnsupportedLookAndFeelException e1) {
+				e1.printStackTrace();
+			}
 			EventQueue.invokeLater(new Runnable() {
 				public void run() {
 					try {
@@ -38,27 +55,53 @@ public class Main {
 		}
 	}
 
+	public static void findAllSolutions(int hetmans, boolean backtracing) {
+		HetmansProblemFactory factory = HetmansProblemFactory.getFactory();
+		Coinstraint<Integer>[] coinstraints = factory.getCoinstraints(hetmans);
+		List<Integer>[] domains = factory.getDomain(hetmans);
+		ConstraintsProblem<Integer> problem = new ConstraintsProblem<Integer>(
+				coinstraints, domains);
+		CSPSolver<Integer> solver = new CSPSolver<>();
+		solver.backTracking(problem);
+		solver.reset();
+		solver.forwardChecking(problem);
+		solver.reset();
+		int i = 0;
+		long start, end;
+		if (backtracing) {
+			start = System.currentTimeMillis();
+			while (solver.forwardChecking(problem) != null) {
+				++i;
+			}
+			end = System.currentTimeMillis() - start;
+		} else {
+			start = System.currentTimeMillis();
+			while (solver.forwardChecking(problem) != null) {
+				++i;
+			}
+			end = System.currentTimeMillis() - start;
+		}
+
+		System.out
+				.printf("%s\nLiczba hetmanów %d\nLiczba rozwi¹zañ %d\nCzas dzia³ania %d\nLiczba iteracji %d\nLiczba powrotów %d\n",
+						backtracking ? "Backtracking" : "Forward Checking",
+						hetmans, i, end, solver.getIterations(),
+						solver.getBacks());
+	}
+
 	public static void runBenchmark() {
 		ArrayList<Double> timesBackward = new ArrayList<>();
 		ArrayList<Double> timesForward = new ArrayList<>();
 		long start, end;
-		for (int i = 4; i < backwardMax; ++i) {
-			HetmansProblemFactory factory = HetmansProblemFactory.getFactory();
-			Coinstraint<Integer>[] coinstraints = factory.getCoinstraints(i);
-			List<Integer>[] domains = factory.getDomain(i);
-			ConstraintsProblem<Integer> problem = new ConstraintsProblem<Integer>(
-					coinstraints, domains);
-			CSPSolver<Integer> solver = new CSPSolver<>();
+		for (int i = 4; i < maxHetmans; ++i) {
 			start = System.currentTimeMillis();
-			solver.backTracking(problem);
+			findAllSolutions(i, true);
 			end = System.currentTimeMillis() - start;
 			timesBackward.add((double) end);
-			problem = new ConstraintsProblem<Integer>(coinstraints, domains);
 			start = System.currentTimeMillis();
-			solver.forwardChecking(problem);
+			findAllSolutions(i, false);
 			end = System.currentTimeMillis() - start;
 			timesForward.add((double) end);
-			System.out.println(i);
 		}
 		double backward[] = new double[timesBackward.size()];
 		double forward[] = new double[timesBackward.size()];
@@ -104,39 +147,5 @@ public class Main {
 		p.setVisible(true);
 		window3.setContentPane(p);
 		window3.setVisible(true);
-
-		for (int i = backwardMax; i < forwardMax; ++i) {
-			HetmansProblemFactory factory = HetmansProblemFactory.getFactory();
-			Coinstraint<Integer>[] coinstraints = factory.getCoinstraints(i);
-			List<Integer>[] domains = factory.getDomain(i);
-			ConstraintsProblem<Integer> problem = new ConstraintsProblem<Integer>(
-					coinstraints, domains);
-			CSPSolver<Integer> solver = new CSPSolver<>();
-			start = System.currentTimeMillis();
-			solver.forwardChecking(problem);
-			end = System.currentTimeMillis() - start;
-			timesForward.add((double) end);
-			System.out.println(i);
-		}
-
-		forward = new double[timesForward.size()];
-		x = new double[timesForward.size()];
-		for (int i = 0; i < forward.length; ++i) {
-			forward[i] = timesForward.get(i);
-			x[i] = i + 4;
-		}
-
-		JFrame window4 = new JFrame("Forward Tracking 2");
-		window4.setSize(600, 600);
-		window4.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		p = new Plot2DPanel();
-		p.addLegend("SOUTH");
-		p.addLinePlot("Forward Checking", x, forward);
-		p.setAxisLabel(0, "Liczba Hetmanów");
-		p.setAxisLabel(1, "Czas(ms)");
-		p.setVisible(true);
-		window4.setContentPane(p);
-		window4.setVisible(true);
-
 	}
 }

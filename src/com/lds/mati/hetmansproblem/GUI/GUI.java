@@ -37,6 +37,9 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import java.awt.Dimension;
 import java.awt.Rectangle;
+import java.awt.Component;
+import java.awt.Font;
+import java.awt.Toolkit;
 
 public class GUI extends JFrame implements Hook<Integer>{
 
@@ -48,25 +51,29 @@ public class GUI extends JFrame implements Hook<Integer>{
 	private JTextField textField;
 	private ChessBoard chess;
 	private int boardSize;
-	private JButton btnNewButton;
+	private JButton solveButton;
 	private JCheckBox chckbxPodgld;
 	/**
 	 * @wbp.nonvisual location=456,429
 	 */
 	private final ButtonGroup buttonGroup = new ButtonGroup();
-	private JRadioButton rdbtnNewRadioButton;
+	private JRadioButton backtracingRadio;
 	private JMenuBar menuBar;
 	private JMenu mnNewMenu;
 	private JMenuItem mntmZapiszWynik;
 	private JLabel lblInfo;
 	private JScrollPane scrollPane;
 	private JTextArea textArea;
+	private CSPSolver<Integer> solver;
+	private JButton resetButton;
+	private JPanel panel_3;
 
 
 	/**
 	 * Create the frame.
 	 */
 	public GUI() {
+		setIconImage(Toolkit.getDefaultToolkit().getImage(GUI.class.getResource("/com/lds/mati/hetmansproblem/GUI/result.png")));
 		setTitle("Problem Hetmanów");
 		initGui();
 		
@@ -108,22 +115,48 @@ public class GUI extends JFrame implements Hook<Integer>{
 		panel.add(textField);
 		textField.setColumns(10);
 		
-		btnNewButton = new JButton("Rozmieœæ");
+		panel_3 = new JPanel();
+		panel.add(panel_3);
+		panel_3.setLayout(new BoxLayout(panel_3, BoxLayout.Y_AXIS));
 		
-		panel.add(btnNewButton);
+		solveButton = new JButton("Rozmieœæ");
+		solveButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+		panel_3.add(solveButton);
+		
+		resetButton = new JButton("Resetuj");
+		resetButton.setPreferredSize(new Dimension(77, 23));
+		resetButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				resetSolver();
+				resetButton.setEnabled(false);
+				textField.setEnabled(true);
+			}
+		});
+		resetButton.setEnabled(false);
+		resetButton.setMinimumSize(new Dimension(77, 23));
+		resetButton.setMaximumSize(new Dimension(77, 23));
+		resetButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+		panel_3.add(resetButton);
+		solveButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				textField.setEnabled(false);
+				resetButton.setEnabled(true);
+				buttonPressed();
+			}
+		});
 		
 		JPanel panel_1 = new JPanel();
 		panel.add(panel_1);
 		panel_1.setLayout(new BoxLayout(panel_1, BoxLayout.Y_AXIS));
 		
-		rdbtnNewRadioButton = new JRadioButton("backtracking");
-		rdbtnNewRadioButton.setSelected(true);
-		panel_1.add(rdbtnNewRadioButton);
+		backtracingRadio = new JRadioButton("backtracking");
+		backtracingRadio.setSelected(true);
+		panel_1.add(backtracingRadio);
 		
-		JRadioButton rdbtnNewRadioButton_1 = new JRadioButton("forwardchecking");
-		panel_1.add(rdbtnNewRadioButton_1);
-		buttonGroup.add(rdbtnNewRadioButton);
-		buttonGroup.add(rdbtnNewRadioButton_1);
+		JRadioButton forwardRadio = new JRadioButton("forwardchecking");
+		panel_1.add(forwardRadio);
+		buttonGroup.add(backtracingRadio);
+		buttonGroup.add(forwardRadio);
 		
 		lblInfo = new JLabel("Info");
 		panel.add(lblInfo);
@@ -131,6 +164,7 @@ public class GUI extends JFrame implements Hook<Integer>{
 		lblInfo.setSize(new Dimension(200, 300));
 		
 		textArea = new JTextArea();
+		textArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
 		textArea.setEditable(false);
 		
 		scrollPane = new JScrollPane(textArea);
@@ -140,15 +174,15 @@ public class GUI extends JFrame implements Hook<Integer>{
 		JPanel panel_2 = new JPanel();
 		contentPane.add(panel_2, BorderLayout.CENTER);
 		panel_2.setLayout(new BorderLayout(0, 0));
-		btnNewButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				buttonPressed();
-			}
-		});
 		chess = new ChessBoard();
 		panel_2.add(chess);
 	}
 
+
+	private void resetSolver() {
+		solver = null;
+		chess.setPositions(null);
+	}
 
 	protected void saveResult() {
 		Integer[] positions = chess.getPositions();
@@ -185,17 +219,17 @@ public class GUI extends JFrame implements Hook<Integer>{
 			JOptionPane.showMessageDialog(this, "Wprowadzona wartoœæ jest niepoprawna!");
 			return;
 		}
-		btnNewButton.setEnabled(false);
+		solveButton.setEnabled(false);
 		new Thread(new Runnable() {
 			
 			@Override
 			public void run() {
-				Integer[] result = runScript(rdbtnNewRadioButton.isSelected(), chckbxPodgld.isSelected(), boardSize);
+				Integer[] result = runScript(backtracingRadio.isSelected(), chckbxPodgld.isSelected(), boardSize);
 				if(result!=null)
 					chess.setPositions(result);
 				else
 					JOptionPane.showMessageDialog(GUI.this, "Brak rozwi¹zania!");
-				btnNewButton.setEnabled(true);
+				solveButton.setEnabled(true);
 			}
 		}).start();
 	}
@@ -206,7 +240,8 @@ public class GUI extends JFrame implements Hook<Integer>{
 		List<Integer>[] domains = factory.getDomain(boardSize);
 		
 		ConstraintsProblem<Integer> problem = new ConstraintsProblem<Integer>(coinstraints, domains);
-		CSPSolver<Integer> solver = new CSPSolver<>();
+		if(solver==null)
+			solver = new CSPSolver<>();
 		long currentTime = System.currentTimeMillis();
 		Integer[] result;
 		if(backtracking)
@@ -221,6 +256,8 @@ public class GUI extends JFrame implements Hook<Integer>{
 				result =  solver.forwardChecking(problem);
 		long runTime =  System.currentTimeMillis()-currentTime;
 		System.out.println("Czas dzia³ania "+runTime+" ms");
+		System.out.println("Liczba iteracji "+solver.getIterations());
+		System.out.println("Liczba nawrotów "+solver.getBacks());
 		textArea.append("Czas dzia³ania "+runTime+" ms\n");
 		textArea.setCaretPosition(textArea.getDocument().getLength());
 		return result;
